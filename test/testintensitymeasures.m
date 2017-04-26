@@ -20,17 +20,20 @@ else
     filepath = [folder filenames];
 end
 
-% create a neurotrackertiff object
+%% create a neurotrackertiff object
 nt = neurotrackertiff(filepath);
+
 % modify the stage position calibration [FIXIT]
 nt.stageposition = nt.stageposition * 5;
+figure(1), clf;
+imshowpair(log(nt.pano(1,50,0)+0.01),log(nt.pano(2,50,0)+0.01),'falsecolor','ColorChannels', [1 2 0]);
 
-% compute track and ratio using default parameters
-figure(1)
+%% compute track and ratio using default parameters
+figure(2), clf;
 [X,Y,R] = trackneuron( nt );
 
 % represent the track with a color coded intensity ratio
-figure(2)
+figure(3), clf;
 colorplot(X,Y,R,1)
 grid on
 box on

@@ -33,7 +33,7 @@ classdef neurotrackertiff
         magnification;
         timestamps;
         exposuretime;
-        flip;
+        flip = [true, false];
     end
 
     methods      
@@ -128,8 +128,7 @@ classdef neurotrackertiff
                obj.timestamps(n) = obj.gettagvalue(n, 65009);
                obj.timestamps(n + 1) = obj.timestamps(n);
            end
-           obj.timestamps = obj.timestamps - min(obj.timestamps);
-           obj.stageposition = obj.stageposition;
+           obj.timestamps = obj.timestamps - min(obj.timestamps);           
            obj.stageposition(:,1) = obj.stageposition(:,1) - min(obj.stageposition(:,1));
            obj.stageposition(:,2) = obj.stageposition(:,2) - min(obj.stageposition(:,2));
            %center = repmat(mean(obj.stageposition), size(obj.stageposition,1), 1);
@@ -175,11 +174,11 @@ classdef neurotrackertiff
                 obj.debug(sprintf('Loading image #%d from %s\n', n, obj.pathtofile));
                 setDirectory(obj.tif, n);
                 im = read(obj.tif);
-            end
-            if flip(1) == true
+            end            
+            if obj.flip(1) == true
                 im = im(end:-1:1,:);
             end
-            if flip(2) == true
+            if obj.flip(2) == true
                 im = im(:,end:-1:1);
             end
         end
@@ -201,7 +200,7 @@ classdef neurotrackertiff
             im1 = obj.imread(frame, 1);            
             ref1 = obj.imref2d(frame,1);
             im2 = obj.imread(frame, 2);            
-            ref2 = obj.imref2d(frame,2);
+            ref2 = obj.imref2d(frame,2);            
             imshowpair(im1,ref1,im2,ref2,'falsecolor','ColorChannels', [1 2 0]);
         end
 
@@ -240,6 +239,37 @@ classdef neurotrackertiff
                 hold on;
             end
             hold off
+        end
+        
+        function P = pano(obj, channel, stepframe, type)
+            s = 1e6/obj.pixelsize(1); 
+            mini = min(obj.stageposition)/s - obj.datasize(2:-1:1)/2;
+            maxi = max(obj.stageposition)/s + obj.datasize(2:-1:1)/2;
+            sz = ceil(maxi - mini);
+            sz = sz(2:-1:1);
+            fprintf(1,'pano size is %d x %d pixel\n', sz(1), sz(2));
+            img = obj.imread(1, channel);
+            P = mean(double(img(:))) .* ones(sz); 
+            N = ones(sz);          
+            for frame = 1:stepframe:obj.length()
+                im = obj.imread(frame, channel);                   
+                n = obj.offset(frame, channel);
+                d = obj.stageposition(n,:)/s;  
+                l = max(1, ceil(d(2:-1:1)));
+                u = l + size(im) - 1;
+                %im = im - mean(im(:));
+                %im = imrotate(im,-1.25,'bilinear','crop');
+                if type == 1
+                    P(l(1):u(1),l(2):u(2)) = P(l(1):u(1),l(2):u(2)) + double(im);
+                    N(l(1):u(1),l(2):u(2)) = N(l(1):u(1),l(2):u(2)) + 1;
+                else
+                    P(l(1):u(1),l(2):u(2)) = max(P(l(1):u(1),l(2):u(2)) , double(im));
+                end            
+            end
+            if type == 1
+                P(N>0) = P(N>0) ./ N(N>0);
+            end
+            %P = P - min(P(:));
         end
 
         function [x,y] = tostagecoords(obj, x, y, frame, channel)
