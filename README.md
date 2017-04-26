@@ -1,2 +1,2 @@
 # neurotracker
-Measure of neurone activity in C. Elegans worm
+Measure of neuron activity in C. Elegans worm
