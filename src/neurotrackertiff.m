@@ -192,6 +192,10 @@ classdef neurotrackertiff
             yl = [d(2) - s*obj.datasize(2)/2, d(2) + s*(obj.datasize(2)/2 - 1)];            
             ref = imref2d(obj.datasize(1:2), xl, yl);
         end
+        
+        function etime = elapsedtime(obj, frame, channel)
+            etime = obj.timestamps(obj.offset(frame, channel));
+        end
 
         function imshowpair(obj, frame)
             im1 = obj.imread(frame, 1);            
