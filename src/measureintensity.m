@@ -1,8 +1,8 @@
-function [region1,region2] = measure_intensity(img,x,y,r1,r2,p1,p2,smooth)
+function [region1,region2] = measureintensity(img,x,y,radius,pvalue,smoothing)
 % [region1,region2] = measure_intensity(img,x,y,r1,r2,pvalue,smooth)
 %
-% Measure the intensities in two disks of radius r1 & r2 around position (x,y)
-% Only a fraction of the pixel intensity is taken into account (pvalue)
+% Measure the intensities in two disks of radiuses [r1 r2] around position (x,y)
+% Only a fraction of the pixel intensity is taken into account (pvalue = [p1,p2])
 % 
 % In the 1st ring r<r1, the average of 
 %        intensity > cdfinv(p1) 
@@ -15,7 +15,7 @@ function [region1,region2] = measure_intensity(img,x,y,r1,r2,p1,p2,smooth)
 % Jerome Boulanger 2017
 
 % pre-filter the image
-filter = fspecial('gaussian', 3*smooth, smooth);
+filter = fspecial('gaussian', 3*smoothing, smoothing);
 S = imfilter(double(img), filter, 'symmetric');
 
 % distance function centered on (x,y)
@@ -23,8 +23,8 @@ S = imfilter(double(img), filter, 'symmetric');
 d = sqrt((X-x).^2+(Y-y).^2);
 
 % measure mean intensity for r < r1 & I > alpha
-region1 = segment_bright_blob(S, d < r1, img, p1);
-region2 = segment_background(S, d > r1 & d < r2, img, p2);
+region1 = segment_bright_blob(S, d < radius(1), img, pvalue(1));
+region2 = segment_background(S, d > radius(1) & d < radius(2), img, pvalue(2));
 
 end
 
@@ -41,9 +41,9 @@ function region = segment_background(S,mask,img,pvalue)
     mask = mask & S > ecdfinv(S(mask), pvalue/2) & S < ecdfinv(S(mask), 1 - pvalue/2);    
     CC = bwconncomp(mask);
     S = regionprops(CC,img, 'WeightedCentroid','PixelValues','PixelIdxList','MeanIntensity');
-    I = arrayfun(@intensity, S);
-    [~, idx] = max(I);
-    region = S(idx);    
+    A = arrayfun(@area, S);
+    [~, idx] = max(A);
+    region = S(idx);
 end
 
 function quantile = ecdfinv(X,pvalue)
@@ -55,4 +55,8 @@ end
 function v = intensity(S)
     v = sum(S.PixelValues);
 end
+function v = area(S)
+    v = numel(S.PixelValues);
+end
+
 
