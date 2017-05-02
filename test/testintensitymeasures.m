@@ -30,7 +30,9 @@ imshowpair(log(nt.pano(1,50,0)+0.01),log(nt.pano(2,50,0)+0.01),'falsecolor','Col
 
 %% compute track and ratio using default parameters
 figure(2), clf;
+tic;
 [X,Y,R] = trackneuron( nt );
+toc;
 
 % represent the track with a color coded intensity ratio
 figure(3), clf;

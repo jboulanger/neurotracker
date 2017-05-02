@@ -15,8 +15,12 @@ function [region1,region2] = measureintensity(img,x,y,radius,pvalue,smoothing)
 % Jerome Boulanger 2017
 
 % pre-filter the image
-filter = fspecial('gaussian', 3*smoothing, smoothing);
-S = imfilter(double(img), filter, 'symmetric');
+if smoothing > 0
+    filter = fspecial('gaussian', 3*smoothing, smoothing);
+    S = imfilter(double(img), filter, 'symmetric');
+else
+    S = double(img);
+end
 
 % distance function centered on (x,y)
 [X,Y] = meshgrid(1:size(img,2),1:size(img,1));
