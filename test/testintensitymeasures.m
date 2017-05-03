@@ -1,6 +1,6 @@
 % testintensitymeasure
 %
-% Simple script to test the intensity measurement
+% Simple script to test the intensity measurement.
 %
 % Jerome Boulanger 2017
 
@@ -30,12 +30,19 @@ imshowpair(log(nt.pano(1,50,0)+0.01),log(nt.pano(2,50,0)+0.01),'falsecolor','Col
 
 %% compute track and ratio using default parameters
 figure(2), clf;
-tic;
-[X,Y,R] = trackneuron( nt );
-toc;
+window = 64;
+radius = [20 40];
+pvalue = [0.1 0.1];
+smoothing = 3;
+skipframe = 100;
+[X,Y,R,resultdata] = trackneuron( nt, window, radius, pvalue, smoothing, skipframe);
+% export a log from resultdata
+exportlog(strrep(filepath,'.TIFF','.log'), resultdata);
+% save directly result data as a .mat file
+save(strrep(filepath,'.TIFF','-track.mat'), 'resultdata');
 
-% represent the track with a color coded intensity ratio
-figure(3), clf;
+%% represent the track with a color coded intensity ratio
+fiexportlog(strrep(filename,'.tif','.log'), resultdata);gure(3), clf;
 colorplot(X,Y,R,1)
 grid on
 box on

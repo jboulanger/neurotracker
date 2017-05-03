@@ -1,4 +1,5 @@
-function [X,Y,R] = trackneuron( imgsrc, window, radius, pvalue, smoothing )
+function [X,Y,R,results] = trackneuron( imgsrc, window, radius, pvalue, smoothing, skipframe)
+% tracks = TRACKNEURON (imgsrc, window, radius, pvalue, smoothing, skipframe )
 % tracks = TRACKNEURON (imgsrc, window, radius, pvalue, smoothing )
 % tracks = TRACKNEURON (imgsrc, window, radius, pvalue )
 % tracks = TRACKNEURON (imgsrc, window, radius )
@@ -7,17 +8,28 @@ function [X,Y,R] = trackneuron( imgsrc, window, radius, pvalue, smoothing )
 %
 %  Track a neuron from a sequence of images and measure its activity
 %
-%  imgsrc is an object with imread tostagecoords and elapsedtime methods 
-%  window is a croping window to accelerate processing
-%  radius is a vector [r1,r2] defining the disks and ring for
+%  The input parameters are:
+%  * 'imgsrc' is an object with imread tostagecoords and elapsedtime methods.
+%  Meaning that the functions
+%   imgsrc.imread(frame,channel)
+%   imgsrc.tostagecoords(x,y,frame,channel)
+%   imgsrc.elapsedtime(frame, channel)
+%  are defined. 
+%  You can use imagsrc = neurotrackertiff('path to file') for example.
+%  * 'window' is a croping window to accelerate processing
+%  * 'radius' is a vector [r1,r2] defining the disks and ring for
 %  signal/background intensity analysis
-%  pvalue is a vector [p1,p2] used to detect signal/background intensity
-%  smoothing is the standard deviation of the gaussian filter used to
+%  * 'pvalue' is a vector [p1,p2] used to detect signal/background intensity
+%  * 'smoothing' is the standard deviation of the gaussian filter used to
 %  pre-filter the image for detection/segmentation.
+%  * 'skipframe' control how often the frames are displayed. skipframe=1
+%  shows all frame, skipframe=10, 1 every 10. skipframe<0, disable
+%  display.
 %
-%  The 3 last parameters are used to feed the function measureintensity
+%  The 3 but last parameters are used to feed the function 'measureintensity'
 %
-%   Output: coordinates X,Y  and ratio
+%  The output is coordinates lists for each frame X,Y and the intensity ratio
+%
 %   Jerome Boulanger 2016-2017
 
 if nargin < 2
@@ -32,10 +44,14 @@ end
 if nargin < 5
     smoothing = 3;
 end
+if nargin < 6
+    skipframe = 1;
+end
 
 X = zeros(1, imgsrc.length());
 Y = zeros(1, imgsrc.length());
 R = zeros(1, imgsrc.length());
+results = struct([]);
 
 tic;
 for t=1:imgsrc.length(); 
@@ -47,13 +63,13 @@ for t=1:imgsrc.length();
         cim1 = im1;
     end
     try 
-        [x, y] = detectspots(cim1, smoothing, 1e-3);
+        [x, y] = detectspots(cim1, smoothing, 1e-3, true);    
     catch 
         x = X(t-1);
         y = Y(t-1);
     end
     [v1,b1] = measureintensity(cim1,x,y,radius,pvalue,smoothing);
-        
+    
     im2 = double(imgsrc.imread(t,2));
     if window > 0
         cim2 = im2(w/2-window:w/2+window-1,w/2-window:w/2+window-1); 
@@ -67,15 +83,27 @@ for t=1:imgsrc.length();
     [X(t),Y(t)] = imgsrc.tostagecoords(x,y,t,1);      
     
     R(t) = (v1.MeanIntensity - b1.MeanIntensity) / (v2.MeanIntensity - b2.MeanIntensity);
-    if mod(t,10) == 0
+    results(t).frame = t;
+    results(t).time = imgsrc.elapsedtime(imgsrc.length(),1)/1000;
+    results(t).position = [X(t),Y(t)];
+    results(t).background1 = b1;
+    results(t).background2 = b2;
+    results(t).signal1 = v1;
+    results(t).signal2 = v2;   
+    x1 = results(t).signal1.WeightedCentroid(2);
+    y1 = results(t).signal1.WeightedCentroid(1);    
+    [x1, y1] = imgsrc.tostagecoords(x1,y1,t,1);
+    results(t).signal1.position = [x1, y1];    
+    x2 = results(t).signal2.WeightedCentroid(2);
+    y2 = results(t).signal2.WeightedCentroid(1); 
+    [x2, y2] = imgsrc.tostagecoords(x2,y2,t,2);
+    results(t).signal2.position = [x2, y2];
+    
+    if mod(t,skipframe) == 0 && skipframe > 0
         showchannels(cim1,v1,b1,1,'channel 1');
         showchannels(cim2,v2,b2,2,'channel 2');
         showgraphs(imgsrc, im1, im2, t, X, Y,x,y,radius, R);
-    end    
-    %mask = zeros(size(cim1));
-    %mask(b1.PixelIdxList) = cim1(b1.PixelIdxList);    
-    %imshow(mask,[]);
-    %drawnow;
+    end
 end
 toc
 

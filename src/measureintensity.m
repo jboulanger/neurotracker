@@ -1,5 +1,5 @@
 function [region1,region2] = measureintensity(img,x,y,radius,pvalue,smoothing)
-% [region1,region2] = measure_intensity(img,x,y,r1,r2,pvalue,smooth)
+% [region1,region2] = MEASUREINTENSITY(img,x,y,r1,r2,pvalue,smooth)
 %
 % Measure the intensities in two disks of radiuses [r1 r2] around position (x,y)
 % Only a fraction of the pixel intensity is taken into account (pvalue = [p1,p2])
@@ -26,41 +26,38 @@ end
 [X,Y] = meshgrid(1:size(img,2),1:size(img,1));
 d = sqrt((X-x).^2+(Y-y).^2);
 
-% measure mean intensity for r < r1 & I > alpha
+% measure mean intensity in inner disk
 region1 = segment_bright_blob(S, d < radius(1), img, pvalue(1));
+% measure mean intensity in outer ring
 region2 = segment_background(S, d > radius(1) & d < radius(2), img, pvalue(2));
-
 end
 
 function region = segment_bright_blob(S, mask, img, pvalue)    
+% Segment a bright blob in the mask based on the values of the smooth
+% function. Return the intensity values in the original image img.
     mask = mask & (S > ecdfinv(S(mask), 1 - pvalue));        
     CC = bwconncomp(mask);    
-    S = regionprops(CC,img, 'WeightedCentroid','PixelValues','PixelIdxList','MeanIntensity');
-    I = arrayfun(@intensity, S);
+    allregion = regionprops(CC, img, 'WeightedCentroid', 'PixelValues','PixelIdxList','MeanIntensity','Area');
+    I = [allregion.MeanIntensity];
     [~, idx] = max(I);
-    region = S(idx);    
+    region = allregion(idx);    
 end
 
 function region = segment_background(S,mask,img,pvalue)
+% Segment the background in mask based on the values of the smooth
+% function. Return the intensity values in the original image img.
     mask = mask & S > ecdfinv(S(mask), pvalue/2) & S < ecdfinv(S(mask), 1 - pvalue/2);    
-    CC = bwconncomp(mask);
-    S = regionprops(CC,img, 'WeightedCentroid','PixelValues','PixelIdxList','MeanIntensity');
-    A = arrayfun(@area, S);
+    allregion = regionprops(mask, img, 'WeightedCentroid', 'PixelValues','PixelIdxList','MeanIntensity','Area');
+    A = [allregion.Area];    
     [~, idx] = max(A);
-    region = S(idx);
+    region = allregion(idx);
 end
 
 function quantile = ecdfinv(X,pvalue)
+% Empirical inverse cumultive distribution function
     vals = sort(X);
     k = max(1,min(numel(vals), round(pvalue * numel(vals))));   
     quantile = vals(k);
-end
-
-function v = intensity(S)
-    v = sum(S.PixelValues);
-end
-function v = area(S)
-    v = numel(S.PixelValues);
 end
 
 
