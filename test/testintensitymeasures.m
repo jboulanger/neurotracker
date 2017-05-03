@@ -38,7 +38,7 @@ f = figure(2);
 set(f,'Position',scrsz), clf;
 window = 64;
 radius = [20 40];
-pvalue = [0.1 0.1];
+pvalue = [0.05 0.1];
 smoothing = 3;
 skipframe = 100;
 [X,Y,R,resultdata] = trackneuron( nt, window, radius, pvalue, smoothing, skipframe);
@@ -48,7 +48,7 @@ exportlog(strrep(filepath,'.TIFF','.log'), resultdata);
 save(strrep(filepath,'.TIFF','-track.mat'), 'resultdata');
 
 %% represent the track with a color coded intensity ratio
-fiexportlog(strrep(filename,'.tif','.log'), resultdata);gure(3), clf;
+exportlog(strrep(filename,'.tif','.log'), resultdata);
 colorplot(X,Y,R,1)
 grid on
 box on
