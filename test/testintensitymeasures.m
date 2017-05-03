@@ -24,12 +24,18 @@ end
 nt = neurotrackertiff(filepath);
 
 % modify the stage position calibration [FIXIT]
-nt.stageposition = nt.stageposition * 5;
+correction_factor = 5;
+nt.stageposition = nt.stageposition * correction_factor;
+
+% check the stage calibration by creating a panoramic view (stiched)
 figure(1), clf;
 imshowpair(log(nt.pano(1,50,0)+0.01),log(nt.pano(2,50,0)+0.01),'falsecolor','ColorChannels', [1 2 0]);
+title('Stitched image [please check if the stage registration is correct]')
 
 %% compute track and ratio using default parameters
-figure(2), clf;
+scrsz = get(groot,'ScreenSize');
+f = figure(2);
+set(f,'Position',scrsz), clf;
 window = 64;
 radius = [20 40];
 pvalue = [0.1 0.1];

@@ -241,32 +241,35 @@ classdef neurotrackertiff
             hold off
         end
         
-        function P = pano(obj, channel, stepframe, type)
+        function P = pano(obj, channel, stepframe, blendingmode)
             s = 1e6/obj.pixelsize(1); 
             mini = min(obj.stageposition)/s - obj.datasize(2:-1:1)/2;
             maxi = max(obj.stageposition)/s + obj.datasize(2:-1:1)/2;
             sz = ceil(maxi - mini);
-            sz = sz(2:-1:1);
-            fprintf(1,'pano size is %d x %d pixel\n', sz(1), sz(2));
+            sz = sz(2:-1:1);            
+            if max(sz) > 0.5*max(get(groot,'ScreenSize'))
+                alpha = 0.5*max(get(groot,'ScreenSize')) / max(sz);
+                sz = round(alpha * sz);
+            end
+            fprintf(1,'pano size is %d x %d pixel (zoom:%f)\n', sz(1), sz(2), alpha);
             img = obj.imread(1, channel);
             P = mean(double(img(:))) .* ones(sz); 
             N = ones(sz);          
             for frame = 1:stepframe:obj.length()
-                im = obj.imread(frame, channel);                   
+                im = obj.imread(frame, channel);
+                im = imresize(im, alpha);
                 n = obj.offset(frame, channel);
-                d = obj.stageposition(n,:)/s;  
+                d = alpha * obj.stageposition(n,:)/s;  
                 l = max(1, ceil(d(2:-1:1)));
                 u = l + size(im) - 1;
-                %im = im - mean(im(:));
-                %im = imrotate(im,-1.25,'bilinear','crop');
-                if type == 1
+                if blendingmode == 1
                     P(l(1):u(1),l(2):u(2)) = P(l(1):u(1),l(2):u(2)) + double(im);
                     N(l(1):u(1),l(2):u(2)) = N(l(1):u(1),l(2):u(2)) + 1;
                 else
                     P(l(1):u(1),l(2):u(2)) = max(P(l(1):u(1),l(2):u(2)) , double(im));
                 end            
             end
-            if type == 1
+            if blendingmode == 1
                 P(N>0) = P(N>0) ./ N(N>0);
             end
             %P = P - min(P(:));
