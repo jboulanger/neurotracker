@@ -249,7 +249,7 @@ classdef neurotrackertiff
             sz = sz(2:-1:1);            
             if max(sz) > 0.5*max(get(groot,'ScreenSize'))
                 alpha = 0.5*max(get(groot,'ScreenSize')) / max(sz);
-                sz = round(alpha * sz);
+                sz = ceil(alpha * sz);
             end
             fprintf(1,'pano size is %d x %d pixel (zoom:%f)\n', sz(1), sz(2), alpha);
             img = obj.imread(1, channel);
