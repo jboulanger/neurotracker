@@ -1,13 +1,13 @@
 classdef neurotrackertiff
     % neurotrackertiff
     %   Read images in a Tiff file acquired with neurotracker from Xavier
-    %   Baels.
+    %   Baels.        
     %
     %  nt = neurotrackertiff('test.tif');
     %  nt.playmovie();
     %  nt.closetiff();
     %
-    %  Tiff tags:  
+    %  Tiff tags:
     %  Tag 65000    TAG_TRACKING_POSITION_X,  TIFF_SHORT,  "Tracking Result X component [pixel]" ,
     %  Tag 65001    TAG_TRACKING_POSITION_Y, TIFF_SHORT,  "Tracking Result Y component [pixel]",
     %  Tag 65002    TAG_TARGET_POSITION_X,  TIFF_SHORT,  "Target Position X component [pixel]",
@@ -21,19 +21,18 @@ classdef neurotrackertiff
     %  Tag 65010    TAG_EXPOSURE_TIME,  TIFF_LONG,  "Exposure time [ms]"
 
     properties
-        pathtofile;
-        datasize = [1 1 1 2 1];
-        warningmode;
-        metadata;
-        imagecount;
-        tif;
-        stageposition; % Nx2
-        limits;
-        pixelsize;        
-        magnification;
-        timestamps;
-        exposuretime;
-        flip = [true, false];
+        pathtofile; % a single string or a cell of string
+        datasize = [1 1 1 2 1]; % size in all dimensions [xyzct]
+        warningmode; % prints warning or just errors
+        metadata; % the list of all metadata as a array of structs
+        imagecount; % number of images for each file
+        tif; % TIFF object or array of tiff objects
+        stageposition; % Nimage x (x,y) array            
+        magnification; % Microscope magnification
+        pixelsize; % [dx,dy] Size of the pixel in x and y directions
+        timestamps; % array of time stamps for each image
+        exposuretime; % Exposure time for each image
+        flip = [true, false]; % Flip images X and Y dirrections        
     end
 
     methods      

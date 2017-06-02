@@ -1,4 +1,4 @@
-function [X,Y,R,results] = trackneuron( imgsrc, window, radius, pvalue, smoothing, skipframe)
+function results = trackneuron( imgsrc, window, radius, pvalue, smoothing, skipframe)
 % tracks = TRACKNEURON (imgsrc, window, radius, pvalue, smoothing, skipframe )
 % tracks = TRACKNEURON (imgsrc, window, radius, pvalue, smoothing )
 % tracks = TRACKNEURON (imgsrc, window, radius, pvalue )
@@ -48,10 +48,7 @@ if nargin < 6
     skipframe = 1;
 end
 
-X = zeros(1, imgsrc.length());
-Y = zeros(1, imgsrc.length());
-R = zeros(1, imgsrc.length());
-results = struct([]);
+results = trackset(1,imgsrc.length(),2);
 
 tic;
 for t=1:imgsrc.length(); 
@@ -83,21 +80,9 @@ for t=1:imgsrc.length();
     [X(t),Y(t)] = imgsrc.tostagecoords(x,y,t,1);      
     
     R(t) = (v1.MeanIntensity - b1.MeanIntensity) / (v2.MeanIntensity - b2.MeanIntensity);
-    results(t).frame = t;
-    results(t).time = imgsrc.elapsedtime(imgsrc.length(),1)/1000;
-    results(t).position = [X(t),Y(t)];
-    results(t).background1 = b1;
-    results(t).background2 = b2;
-    results(t).signal1 = v1;
-    results(t).signal2 = v2;   
-    x1 = results(t).signal1.WeightedCentroid(2);
-    y1 = results(t).signal1.WeightedCentroid(1);    
-    [x1, y1] = imgsrc.tostagecoords(x1,y1,t,1);
-    results(t).signal1.position = [x1, y1];    
-    x2 = results(t).signal2.WeightedCentroid(2);
-    y2 = results(t).signal2.WeightedCentroid(1); 
-    [x2, y2] = imgsrc.tostagecoords(x2,y2,t,2);
-    results(t).signal2.position = [x2, y2];
+           
+    results = results.set(1, t, 1, makerecord(v1,b1,imgsrc,t,1));
+    results = results.set(1, t, 2, makerecord(v2,b2,imgsrc,t,1));
     
     if mod(t,skipframe) == 0 && skipframe > 0
         showchannels(cim1,v1,b1,1,'channel 1');
@@ -157,5 +142,16 @@ function showgraphs(imgsrc, im1, im2, t, X, Y,x,y,radius,R)
     box on
     title('Intensity ratio')
     drawnow  
+end
+
+function rec = makerecord(I,B,imgsrc,t,c)
+    x = I.WeightedCentroid(2);
+    y = I.WeightedCentroid(1);   
+    [x,y] = imgsrc.tostagecoords(x,y,t,c);
+    rec.signal = I;
+    rec.background = B;    
+    rec.x = x;
+    rec.y = y;
+    rec.t = imgsrc.elapsedtime(t,c) / 1000;
 end
 

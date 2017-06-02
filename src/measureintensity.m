@@ -40,7 +40,8 @@ function region = segment_bright_blob(S, mask, img, pvalue)
     allregion = regionprops(CC, img, 'WeightedCentroid', 'PixelValues','PixelIdxList','MeanIntensity','Area');
     I = [allregion.MeanIntensity];
     [~, idx] = max(I);
-    region = allregion(idx);    
+    region = allregion(idx);
+    region.size = size(S);
 end
 
 function region = segment_background(S,mask,img,pvalue)
@@ -51,6 +52,7 @@ function region = segment_background(S,mask,img,pvalue)
     A = [allregion.Area];    
     [~, idx] = max(A);
     region = allregion(idx);
+    region.size = size(S);
 end
 
 function quantile = ecdfinv(X,pvalue)

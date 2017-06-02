@@ -21,6 +21,7 @@ else
 end
 
 %% create a neurotrackertiff object
+disp('Opening the file');
 nt = neurotrackertiff(filepath);
 
 % modify the stage position calibration [FIXIT]
@@ -28,11 +29,13 @@ correction_factor = 5;
 nt.stageposition = nt.stageposition * correction_factor;
 
 % check the stage calibration by creating a panoramic view (stiched)
+disp('Create a stiched image');
 figure(1), clf;
 imshowpair(log(nt.pano(1,50,0)+0.01),log(nt.pano(2,50,0)+0.01),'falsecolor','ColorChannels', [1 2 0]);
 title('Stitched image [please check if the stage registration is correct]')
 
 %% compute track and ratio using default parameters
+disp('Extract a track');
 scrsz = get(groot,'ScreenSize');
 f = figure(2);
 set(f,'Position',scrsz), clf;
@@ -41,19 +44,44 @@ radius = [20 40];
 pvalue = [0.05 0.1];
 smoothing = 3;
 skipframe = 100;
-[X,Y,R,resultdata] = trackneuron( nt, window, radius, pvalue, smoothing, skipframe);
-% export a log from resultdata
-exportlog(strrep(filepath,'.TIFF','.log'), resultdata);
-% save directly result data as a .mat file
-save(strrep(filepath,'.TIFF','-track.mat'), 'resultdata');
+tracks = trackneuron( nt, window, radius, pvalue, smoothing, skipframe);
+disp('Export results')
+tracks.save(strrep(filepath,'.TIFF','-track.mat'));
+tracks.exportlog(strrep(filepath,'.TIFF','-track.log'));
 
 %% represent the track with a color coded intensity ratio
-exportlog(strrep(filename,'.tif','.log'), resultdata);
+disp('Display the track');
+A = 0.67;
+B = 0.93;
+[X,Y] = tracks.position();
+[R,T] = tracks.ratio(A,B);
+subplot(221)
+colorplot(X,Y,T,1)
+grid on
+box on
+xlabel('X ({\mu}m)')
+ylabel('Y ({\mu}m)')
+title('color coded time');
+colormap jet
+colorbar;
+
+subplot(222)
 colorplot(X,Y,R,1)
 grid on
 box on
 xlabel('X ({\mu}m)')
 ylabel('Y ({\mu}m)')
-title('Color-coded intensity ratio');
+title('color coded ratio');
 colormap jet
 colorbar;
+
+subplot(212)
+plot(T,R);
+axis tight
+grid on;
+title('Ratio over time')
+xlabel('Time (s)')
+ylabel('Ratio')
+%%
+inspecttracks(tracks);
+disp('Done');

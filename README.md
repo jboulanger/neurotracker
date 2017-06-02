@@ -1,6 +1,28 @@
 # neurotracker
 Measure of neuron activity in C. Elegans worm
 
+## Detail of classes in src/
+### neurotrackertiff 
+
+Load images from a TIFF produced by neurotracker tiff
+
+### trackset 
+
+Store tracks of several spots across the time sequence. Also stores 
+
+- To retreive the position over time of all spots:
+```
+[x,y] = tracks.position();
+plot(x(1,:),y(1,:));
+```
+
+- To get the ratio with the correction formula (R-A)*B
+``` 
+A = 0.67;
+B = 0.93;
+[r,t] = tracks.ratio(A,B);
+plot(r(1,:),t(1,:));    
+```
 
 ## Tags
 - Tag 65000    TAG_TRACKING_POSITION_X,  TIFF_SHORT,  "Tracking Result X component [pixel]" ,
