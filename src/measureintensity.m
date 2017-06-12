@@ -34,25 +34,28 @@ end
 
 function region = segment_bright_blob(S, mask, img, pvalue)    
 % Segment a bright blob in the mask based on the values of the smooth
-% function. Return the intensity values in the original image img.
-    mask = mask & (S > ecdfinv(S(mask), 1 - pvalue));        
+% function. Return the intensity values in the original image img.        
+    mask = mask & (S > prctile(S(mask), 100 * (1 - pvalue)));        
     CC = bwconncomp(mask);    
     allregion = regionprops(CC, img, 'WeightedCentroid', 'PixelValues','PixelIdxList','MeanIntensity','Area');
     I = [allregion.MeanIntensity];
     [~, idx] = max(I);
     region = allregion(idx);
     region.size = size(S);
+    region.SMedianIntensity = median(S(region.PixelIdxList));
+    region.MedianIntensity = median(img(region.PixelIdxList));
 end
 
 function region = segment_background(S,mask,img,pvalue)
 % Segment the background in mask based on the values of the smooth
 % function. Return the intensity values in the original image img.
-    mask = mask & S > ecdfinv(S(mask), pvalue/2) & S < ecdfinv(S(mask), 1 - pvalue/2);    
+    mask = mask & S > prctile(S(mask), 100*pvalue/2) & S < prctile(S(mask),100 * ( 1 - pvalue/2));    
     allregion = regionprops(mask, img, 'WeightedCentroid', 'PixelValues','PixelIdxList','MeanIntensity','Area');
     A = [allregion.Area];    
     [~, idx] = max(A);
     region = allregion(idx);
     region.size = size(S);
+    region.SMedianIntensity = median(S(region.PixelIdxList));
 end
 
 function quantile = ecdfinv(X,pvalue)

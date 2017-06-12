@@ -32,27 +32,35 @@ classdef trackset
             data = obj.data(spot,frame,channel);           
         end
         
-        function [R, T] = ratio(obj, A, B)
+        function [R, T] = ratio(obj, A, B, smoothing)
             % Return the ratio over time for each spot
             if nargin < 2
                 A = 0.67;
             end
             if nargin < 3
                 B = 0.93;
-            end            
+            end  
+            if nargin < 4
+                smoothing = 0;
+            end
             R = zeros(size(obj.data,1),size(obj.data,2));
             T = zeros(size(obj.data,1), size(obj.data,2));
             for i = 1:size(obj.data,1) % for each spot                    
                 for t = 1:size(obj.data,2) % for each frame                
-                    I1 = obj.data(i,t,1).signal.MeanIntensity;
+                    I1 = obj.data(i,t,1).signal.SMedianIntensity;
                     B1 = obj.data(i,t,1).background.MeanIntensity;
-                    I2 = obj.data(i,t,2).signal.MeanIntensity;
+                    I2 = obj.data(i,t,2).signal.SMedianIntensity;
                     B2 = obj.data(i,t,2).background.MeanIntensity;                    
                     R(i,t) = ((I1 - B1) / (I2 - B2) - A) * B;
                     T(i,t) = obj.data(i,t,1).t;
                 end
             end
-        end                
+            if smoothing > 0
+                sz = [1, ceil(3*(2*smoothing+1))];
+                flt = fspecial('gaussian',sz, smoothing);
+                R = imfilter(R, flt, 'symmetric');
+            end
+        end        
         
         function [X, Y] = position(obj) 
             % Return the global position over time of the spots

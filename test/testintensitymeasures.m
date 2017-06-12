@@ -51,10 +51,12 @@ tracks.exportlog(strrep(filepath,'.TIFF','-track.log'));
 
 %% represent the track with a color coded intensity ratio
 disp('Display the track');
+figure
 A = 0.67;
 B = 0.93;
+ratio_smoothing = 3;
 [X,Y] = tracks.position();
-[R,T] = tracks.ratio(A,B);
+[R,T] = tracks.ratio(A,B, ratio_smoothing);
 subplot(221)
 colorplot(X,Y,T,1)
 grid on
@@ -82,6 +84,6 @@ grid on;
 title('Ratio over time')
 xlabel('Time (s)')
 ylabel('Ratio')
-%%
+%% Interactive display of tracks
 inspecttracks(tracks);
 disp('Done');
