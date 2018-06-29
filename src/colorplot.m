@@ -1,5 +1,6 @@
 function colorplot(x,y,v,mode)
 if mode == 1
+    v = double(v);
     surface([x;x],[y;y],[zeros(size(x));zeros(size(x))],[v;v],...
         'facecol','no',...
         'edgecol','interp',...
@@ -9,7 +10,7 @@ else
     colormap('gray');    
     idx = floor((v -min(v)) / (max(v)-min(v)) * (size(cmap,1)-1))+1;    
     for i=1:length(x)-1        
-        line([x(i);x(i+1)],[y(i);y(i+1)],'color', cmap(idx(i),:));
+        line([x(i);x(i+1)],[y(i);y(i+1)],'color', cmap(idx(i),:),'LineWidth',2);
         hold on
     end
     colormap('gray');

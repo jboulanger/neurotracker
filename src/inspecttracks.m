@@ -19,6 +19,7 @@ txt = uicontrol('Style','text',...
         'Position',[200 45 120 20],...
         'String','Frame');
 f.Visible = 'on';
+
 end
 
 function slider_callback(source, callbackdata)
@@ -70,6 +71,7 @@ grid on;
 title(sprintf('Ratio over time [%.2f]', R(frame)))
 xlabel('Time (s)')
 ylabel('Ratio')
+
 
 
 end

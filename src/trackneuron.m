@@ -91,8 +91,9 @@ for t=1:imgsrc.length();
     end
 end
 toc
-
 end
+
+
 function showchannels(im,v,b,pos,str) 
     subplot(2,2,pos)
     maskv = zeros(size(im));

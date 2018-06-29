@@ -15,7 +15,16 @@ classdef trackset
     end    
     methods
         function obj = trackset(nspots,nframes,nchannels)
-           obj.data = repmat(struct('x',0,'y',0,'t',0,'signal',[],'background',[]), [nspots, nframes, nchannels]);
+            if nargin == 0
+                [filename, folder] = uigetfile('*.mat','Select a track file');
+                s = load([folder, filename]);
+                obj = s.obj;
+            elseif nargin == 1
+                s = load(nspots);
+                obj = s.obj;
+            else
+                obj.data = repmat(struct('x',0,'y',0,'t',0,'signal',[],'background',[]), [nspots, nframes, nchannels]);
+            end
         end
         
         function obj = set(obj, spot, frame, channel, data)  
@@ -47,10 +56,10 @@ classdef trackset
             T = zeros(size(obj.data,1), size(obj.data,2));
             for i = 1:size(obj.data,1) % for each spot                    
                 for t = 1:size(obj.data,2) % for each frame                
-                    I1 = obj.data(i,t,1).signal.SMedianIntensity;
-                    B1 = obj.data(i,t,1).background.MeanIntensity;
-                    I2 = obj.data(i,t,2).signal.SMedianIntensity;
-                    B2 = obj.data(i,t,2).background.MeanIntensity;                    
+                    I1 = obj.signal(i,t,1);
+                    B1 = obj.background(i,t,1);
+                    I2 = obj.signal(i,t,2);
+                    B2 = obj.background(i,t,2);                
                     R(i,t) = ((I1 - B1) / (I2 - B2) - A) * B;
                     T(i,t) = obj.data(i,t,1).t;
                 end
@@ -60,7 +69,16 @@ classdef trackset
                 flt = fspecial('gaussian',sz, smoothing);
                 R = imfilter(R, flt, 'symmetric');
             end
-        end        
+        end       
+        
+        function I = signal(obj,spot,frame,channel) 
+            I = obj.data(spot,frame,channel).signal.SMedianIntensity;
+        end
+        
+        function I = background(obj,spot,frame,channel) 
+            I = obj.data(spot,frame,channel).background.SMedianIntensity;
+        end
+        
         
         function [X, Y] = position(obj) 
             % Return the global position over time of the spots

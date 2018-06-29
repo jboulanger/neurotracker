@@ -23,7 +23,7 @@ f.Visible = 'on';
 refresh(obj, 1);
 end
 
-function [v2, angle, curvature] = compute_descriptors(X,Y)
+function [v2, angle, curvature] = compute_descriptors(X,Y,T)
 g = fspecial('gaussian',[1 11], 1);
 shape = 'same';
 d1p = conv(g, [0 0 0 0 -1 1 0 0 0 0 0], shape);
@@ -38,6 +38,8 @@ angle = acosd( sum(v1 .* v2) ./ (sqrt(sum(v1.^2)) .* sqrt(sum(v2.^2))));
 curvature = abs(v2(1,:) .* a(2,:) - v2(2,:) .* a(1,:)) ./ max(sum(v2.^2),eps).^(3/2);
 curvature(1) = curvature(2); curvature(end) = curvature(end-1);
 curvature = log(curvature);
+% normalize the speed by the time steps using the same derivative filter
+v2 = v2 ./ mean(diff(T));
 end
 
 function slider_callback(source, callbackdata)
@@ -46,13 +48,13 @@ data = h.UserData;
 obj = data.tracks;
 frame = int32(source.Value);
 refresh(obj, frame);
-
 end
 
 function refresh(obj, frame)
 [X,Y] = obj.position();
+[R,T] = obj.ratio();
 w = 30;
-[veloc, angle, curvature] = compute_descriptors(X,Y);
+[veloc, angle, curvature] = compute_descriptors(X,Y,T);
 t0=max(1,frame-w);
 t1=min(numel(angle),frame+w);
 threshold = 50;
@@ -101,8 +103,7 @@ hold off
 axis square; axis tight; grid on;
 
 subplot(247)
-ratio = obj.ratio();
-plot(ratio(t0:t1),'r');hold on; plot([w+1 w+1],[min(ratio) max(ratio)],'r'); hold off
+plot(T(t0:t1),R(t0:t1),'r');hold on; plot([w+1 w+1],[min(R) max(R)],'r'); hold off
 
 axis square; axis tight; grid on;
 title('Ratio');

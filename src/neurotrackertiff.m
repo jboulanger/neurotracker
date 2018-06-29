@@ -12,8 +12,8 @@ classdef neurotrackertiff
     %  Tag 65001    TAG_TRACKING_POSITION_Y, TIFF_SHORT,  "Tracking Result Y component [pixel]",
     %  Tag 65002    TAG_TARGET_POSITION_X,  TIFF_SHORT,  "Target Position X component [pixel]",
     %  Tag 65003    TAG_TARGET_POSITION_Y, TIFF_SHORT,  "Target Position Y component [pixel]",
-    %  Tag 65004    TAG_TRAY_POSITION_X,  TIFF_LONG,  "Stage Position X component [?]",
-    %  Tag 6500596  TAG_TRAY_POSITION_Y, TIFF_LONG,  "Stage Position Y component [?]",
+    %  Tag 65004    TAG_TRAY_POSITION_X,  TIFF_LONG,  "Stage Position X component [micrometer]",
+    %  Tag 6500596  TAG_TRAY_POSITION_Y, TIFF_LONG,  "Stage Position Y component [micrometer]",
     %  Tag 6500695  TAG_PIXEL_WIDTH,  TIFF_FLOAT,  "Pixel width [micrometer]",
     %  Tag 65007    TAG_PIXEL_HEIGHT, TIFF_FLOAT,  "Pixel height [micrometer]",
     %  Tag 65008    TAG_MAGNIFICATION,  TIFF_SHORT,  "Magnification",
@@ -32,7 +32,7 @@ classdef neurotrackertiff
         pixelsize; % [dx,dy] Size of the pixel in x and y directions
         timestamps; % array of time stamps for each image
         exposuretime; % Exposure time for each image
-        flip = [true, false]; % Flip images X and Y dirrections        
+        flip = [true, true; false, false]; % Flip images X and Y directions        
     end
 
     methods      
@@ -47,7 +47,8 @@ classdef neurotrackertiff
             obj = obj.loadmetadata();
             obj = obj.opentiff();
             obj = obj.loadstagepositions();
-            obj.flip = [true,false];
+            obj.flip = [true,false;
+                        false, false];
         end
 
         function obj = setwarningmode(obj, mode)
@@ -58,6 +59,16 @@ classdef neurotrackertiff
             else
                 warning('on', 'MATLAB:imagesci:tiffmexutils:libtiffWarning');
             end
+        end
+        
+        function obj = setpixelsize(obj, camera_pixelsize_um)
+            % set the physical pixel size of the camera in um
+            obj.pixelsize = [camera_pixelsize_um camera_pixelsize_um];
+        end
+        
+        function obj = setmagnification(obj, M)
+            % set the total magnification of the microscope
+            obj.magnification = M;
         end
 
         function obj = opentiff(obj)
@@ -174,10 +185,10 @@ classdef neurotrackertiff
                 setDirectory(obj.tif, n);
                 im = read(obj.tif);
             end            
-            if obj.flip(1) == true
+            if obj.flip(channel,1) == true
                 im = im(end:-1:1,:);
             end
-            if obj.flip(2) == true
+            if obj.flip(channel,2) == true
                 im = im(:,end:-1:1);
             end
         end
@@ -240,7 +251,19 @@ classdef neurotrackertiff
             hold off
         end
         
-        function P = pano(obj, channel, stepframe, blendingmode)
+        function P = pano(obj, channel, stepframe, blendingmode)            
+            % P = nt.pano(channel, stepframe, blendingmode)
+            %
+            % Input:
+            %  channel : color channel 
+            %  stepframe : frame to skip
+            %  blendingmode : if equal to 1, 'average projection' otherwise
+            %                 'max projection'
+            % Output 
+            %  panoramic image for the 'channel' with 1 frame every
+            %  'stepframe'
+            %
+            %
             s = 1e6/obj.pixelsize(1); 
             mini = min(obj.stageposition)/s - obj.datasize(2:-1:1)/2;
             maxi = max(obj.stageposition)/s + obj.datasize(2:-1:1)/2;
@@ -275,10 +298,17 @@ classdef neurotrackertiff
         end
 
         function [x,y] = tostagecoords(obj, x, y, frame, channel)
-            d = obj.stageposition(obj.offset(frame, channel),:);
-            s = 1e6/obj.pixelsize(1); 
-            x = s*x + d(1) - s*obj.datasize(1) / 2;
-            y = s*y + d(2) - s*obj.datasize(2) / 2;
+            % [x,y] = tostagecoords(obj, x, y, frame, channel)
+            % 
+            % convert the coordinates X,Y in pixel in the image to the 
+            % coordinates of the real world by taking into account the
+            % stage position, the pixel size and the magnification
+            %
+            d = obj.stageposition(obj.offset(frame, channel),:);     
+            p = obj.pixelsize / obj.magnification;
+            c = obj.datasize(1:2) / 2;
+            x = d(1) + p(1) * (x - c(1));
+            y = d(2) + p(2) * (y - c(2));
         end
 
         function debug(obj, msg)
