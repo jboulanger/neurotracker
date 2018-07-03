@@ -21,21 +21,17 @@ else
 end
 
 %% create a neurotrackertiff object
-if ~iscell(filepath)
-    fprintf('''Opening file %s''', filepath);
-else
-    disp('Loading...');
-end
 nt = neurotrackertiff(filepath);
-nt.flip=~[false,true;true,false];
-nt.setpixelsize(6.5); % Hamamatsu flash 4 [ 6.5um ]
-nt.setmagnification(16.2); % calibration at 16X
-
+nt.flip = ~[false,true;true,false];
+nt = nt.setpixelsize(13); % Hamamatsu flash 4 [ 6.5um ]
+nt = nt.setmagnification(12.8); % calibration ??
+nt.stageunitum = 0.040593; % from a calibration measurement
+nt.printinfo();
 % check the stage calibration by creating a panoramic view (stiched)
 disp('Create a stiched image');
 figure(1), clf;
-p1 = nt.pano(1,10,0);
-p2 = nt.pano(2,10,0);
+p1 = nt.pano(1,2,0);
+p2 = nt.pano(2,2,0);
 imshowpair(log(p1-min(p1(:))+.1),log(p2-min(p2(:))+.1),'falsecolor','ColorChannels', [1 2 0]);
 %p = nt.pano(1,2,0);
 %imshow(log(p-min(p(:))+0.1),[]);

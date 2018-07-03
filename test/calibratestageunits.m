@@ -9,14 +9,22 @@
 addpath('../src')
 [filename, folder] = uigetfile('*.tiff;*.tif','Pick a calibration file');
 filepath = [folder filename];
+%% load the file
 nt = neurotrackertiff(filepath);
-nt.stageposition = nt.stageposition * 1.01;
-figure(1)
-subplot(211)
-nt.stitch(50)
-title('Check calibration with 5cm ruler');
+%% reset metadata and calibrate the stage
+clf
+nt = nt.setpixelsize(13); % reset the pixel size as always wrong
+nt.magnification = 12.87; % reset the magnification as the estimated by hand on the image
+nt = nt.calibratestageunit(19);
+nt.printinfo();
+%% adjust the flips and play the movie
+clf
+nt.flip = [true,false;true,false];
+nt.playmovie(true, 19);
+%% Show a stiched images of all the frames
+clf;
+imshowpair(nt.pano(1,10,1),nt.pano(2,10,1),'falsecolor','ColorChannels', [1 2 0]);
+title('Check calibration');
 xlabel('x ({\mu}m)')
 ylabel('y ({\mu}m)')
-subplot(212)
-imshowpair(nt.pano(1,10,1),nt.pano(2,10,1),'falsecolor','ColorChannels', [1 2 0]);
 
