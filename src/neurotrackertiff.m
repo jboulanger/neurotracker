@@ -236,7 +236,7 @@ classdef neurotrackertiff
         end
 
         function ref = imref2d(obj, frame, channel)            
-            d = obj.stageposition(frame,channel,:);
+            d = obj.stageposition(frame,channel,1:2);
             s =  obj.pixelsize ./ obj.magnification;      
             xl = [d(1) - s(1)*obj.datasize(1)/2, d(1) + s(1)*(obj.datasize(1)/2-1)];
             yl = [d(2) - s(2)*obj.datasize(2)/2, d(2) + s(2)*(obj.datasize(2)/2-1)];            
@@ -326,7 +326,7 @@ classdef neurotrackertiff
                 im = obj.imread(frame, channel);
                 im = imresize(im, alpha);
                 % compute the position in the destination image                
-                d = alpha * (obj.stageposition(frame,channel,:) ./ s(:)' - R(:,1)');
+                d = alpha * (obj.stageposition(frame,channel,1:2) ./ s(:)' - R(:,1)');
                 l = max(1, ceil(d(2:-1:1))); % lower bound
                 u = l + size(im) - 1; % upper boud                         
                 if blendingmode == 1
@@ -349,7 +349,7 @@ classdef neurotrackertiff
             % coordinates of the real world by taking into account the
             % stage position, the pixel size and the magnification
             %
-            d = obj.stageposition(frame, channel,:);     
+            d = obj.stageposition(frame, channel,1:2);     
             s = obj.pixelsize / obj.magnification;
             c = obj.datasize(1:2) / 2;
             x = d(1) + s(1) * (x - c(1));
@@ -366,15 +366,15 @@ classdef neurotrackertiff
             end
             obj.stageunitum = 1;
             clf;
-            k = 1;
+            k = 1;            
             for frame = 1:stepframe:obj.length() - 1;                
                 im1 = obj.imread(frame, 1);
                 im2 = obj.imread(frame + 1, 1);
                 tform = imregcorr(im2single(im1),im2single(im2),'translation');
                 I(k,:) = tform.T(3,1:2);
-                S(k,:) = obj.stageposition(frame + 1,1,:) - obj.stageposition(frame,1,:);
+                S(k,:) = obj.stageposition(frame + 1,1,1:2) - obj.stageposition(frame,1,1:2);
                 De(k) = norm(tform.T(3,1:2)) * obj.pixelsize(1) / obj.magnification;
-                Ds(k) = norm(obj.stageposition(frame + 1,1,:) - obj.stageposition(frame,1,:));                
+                Ds(k) = norm(obj.stageposition(frame + 1,1,1:2) - obj.stageposition(frame,1,1:2));
                 imshowpair(im1,circshift(im2,-round(tform.T(3,2:-1:1))),'falsecolor','ColorChannels', [1 2 0]);
                 axis on
                 title(sprintf('%d/%d',frame,obj.length()))
