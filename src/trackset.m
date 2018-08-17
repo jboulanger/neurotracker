@@ -1,9 +1,9 @@
 classdef trackset
     properties
         data; % 2D array of struct [time points x spots] each struct is 
-        % .x
-        % .y
-        % .t
+        % .x [um]
+        % .y [um]
+        % .t [s]
         % .signal.WeightedCentroid
         %        .MeanIntensity
         %        .PixelValues
@@ -72,13 +72,14 @@ classdef trackset
         end       
         
         function I = signal(obj,spot,frame,channel) 
-            I = obj.data(spot,frame,channel).signal.SMedianIntensity;
+             % Signal level for the given spot, frame and channel
+            I = obj.data(spot,frame,channel).signal.MeanIntensity;
         end
         
         function I = background(obj,spot,frame,channel) 
-            I = obj.data(spot,frame,channel).background.SMedianIntensity;
-        end
-        
+            % Background level for the given spot, frame and channel
+            I = obj.data(spot,frame,channel).background.MeanIntensity;
+        end        
         
         function [X, Y] = position(obj) 
             % Return the global position over time of the spots
@@ -93,12 +94,15 @@ classdef trackset
         end
       
         function imshow(obj,spot,frame,channel)
+            % Display an image of the detect spots
             I = obj.image(spot,frame,channel,'signal');
             B = obj.image(spot,frame,channel,'background');
             imshowpair(I,B,'falsecolor','ColorChannels', [1 2 0]);
         end                
         
         function I = image(obj,spot,frame,channel,field)
+            % return an image of the given spot, frame and channel with
+            % either 'signal' of 'background' field.
             s = obj.data(spot,frame,channel).(field);
             I = zeros(s.size());
             I(s.PixelIdxList) = s.PixelValues;

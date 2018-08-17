@@ -111,12 +111,13 @@ function showchannels(im,v,b,pos,str)
 end
 
 function showgraphs(imgsrc, im1, im2, t, X, Y,x,y,radius,R)
+    nt = imgsrc.length();
     subplot(223)
     ref1 = imgsrc.imref2d(t,1);
     ref2 = imgsrc.imref2d(t,2);
     imshowpair(im1,ref1,im2,ref2,'falsecolor','ColorChannels', [1 2 0]);
     hold on
-    plot(imgsrc.stageposition(1:2:end,1), imgsrc.stageposition(1:2:end,2));    
+    plot(imgsrc.stageposition(1:nt,1,1), imgsrc.stageposition(1:nt,1,2));       
     plot(X(1:t),Y(1:t),'g-');
     ex1 = x+radius(1)*cosd(0:360);
     ex2 = x+radius(2)*cosd(0:360);

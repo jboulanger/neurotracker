@@ -6,24 +6,36 @@ function inspectbehavior(obj)
 %
 % Jerome Boulanger 2017
 
+userdata = compute_userdata(obj);
+scrsz = get(groot,'ScreenSize');
+%f = figure('Visible','off',...
+%    'Name','Behavior inspection tool','NumberTitle','off',...
+%    'Menubar', 'none', 'Toolbar', 'none','Position',[1 1 scrsz(3) scrsz(4)]);
 
 f = figure('Visible','off',...
     'Name','Behavior inspection tool','NumberTitle','off',...
-    'Menubar', 'none', 'Toolbar', 'none');
+    'Position',[1 1 scrsz(3) scrsz(4)]);
+
 N = size(obj.data,2);
-sld = uicontrol('Style', 'slider',...
+sld1 = uicontrol('Style', 'slider',...
     'Min', 1, 'Max', N, 'Value', 1, 'SliderStep', [1/N, 100/N], ...
-    'Position', [5 5 480 20], ...
-    'Callback', @slider_callback, ...
-    'Tag', 'slidertime', 'UserData', struct('tracks', obj));
+    'Position', [100 30 scrsz(3)-200 20], ...
+    'Callback', @slider1_callback, ...
+    'Tag', 'slidertime', 'UserData', userdata);
+
+
 txt = uicontrol('Style','text',...
-        'Position',[510 5 50 20],...
+        'Position',[100 10 scrsz(3)-200 20],...
         'String','Frame');
+    
 f.Visible = 'on';
-refresh(obj, 1);
+refresh(userdata, 1);
+
 end
 
-function [v2, angle, curvature] = compute_descriptors(X,Y,T)
+function userdata = compute_userdata(obj)
+[X,Y] = obj.position();
+[R,T] = obj.ratio();
 g = fspecial('gaussian',[1 11], 1);
 shape = 'same';
 d1p = conv(g, [0 0 0 0 -1 1 0 0 0 0 0], shape);
@@ -38,74 +50,114 @@ angle = acosd( sum(v1 .* v2) ./ (sqrt(sum(v1.^2)) .* sqrt(sum(v2.^2))));
 curvature = abs(v2(1,:) .* a(2,:) - v2(2,:) .* a(1,:)) ./ max(sum(v2.^2),eps).^(3/2);
 curvature(1) = curvature(2); curvature(end) = curvature(end-1);
 curvature = log(curvature);
-% normalize the speed by the time steps using the same derivative filter
-v2 = v2 ./ mean(diff(T));
-end
-
-function slider_callback(source, callbackdata)
-h = findobj('Tag','slidertime');
-data = h.UserData;
-obj = data.tracks;
-frame = int32(source.Value);
-refresh(obj, frame);
-end
-
-function refresh(obj, frame)
-[X,Y] = obj.position();
-[R,T] = obj.ratio();
-w = 30;
-[veloc, angle, curvature] = compute_descriptors(X,Y,T);
-t0=max(1,frame-w);
-t1=min(numel(angle),frame+w);
+% normalize the speed by the time steps using the same derivative filter [um/s]
+v2 = v2 ./ mean(diff(T)) * 1e-3; 
+%W = log(abs(ccwt(diff(X,1)+1i*diff(Y,1),(0:numel(X)-2),logspace(0,3,64))))';
+W = log(abs(ccwt(v1(1,:)+1i*v1(2,:),(0:numel(X)-1),logspace(0,3,64))))';
 threshold = 50;
 %score = (angle > threshold);
 direction = mod(cumsum(double(angle>threshold)),2);
+% Exchange forward and backward if forward is less frequent.
+if sum(direction==0) > sum(direction==1)
+    direction = 1 - direction;
+end
+% relative velocity (v2 proj on v1 and normal of v1)
+v1n = [v1(2,:); -v1(1,:)];
+userdata.relative_velocity = [dot(v2,v1); dot(v2,v1n)];
+size(userdata.relative_velocity)
+userdata.velocity = v2;
+userdata.angle = angle;
+userdata.curvature = curvature;
+userdata.wavelet = W;
+userdata.direction = direction;
+userdata.R = R;
+userdata.T = T;
+userdata.X = X;
+userdata.Y = Y;
+end
+
+function slider1_callback(source, callbackdata)
+h = findobj('Tag','slidertime');
+data = h.UserData;
+%obj = data.tracks;
+frame = int32(source.Value);
+refresh(data, frame);
+end
+
+function refresh(obj, frame)
+
+w = 1000;
+t0 = max(1,frame-w);
+t1 = min(numel(obj.angle),frame+w);
+
 dirstr = {'backward','forward'};
 
 subplot(241);
 cla
-colorplot(X(t0:t1),Y(t0:t1),direction(t0:t1),1);
+colorplot(obj.X(t0:t1),obj.Y(t0:t1),obj.direction(t0:t1),1);
 %plot(X(t0:t1),Y(t0:t1))
 hold on;
-plot(X(frame), Y(frame), 'ro', 'MarkerSize', 10);
-quiver(X(frame), Y(frame), veloc(1,frame), veloc(2,frame), 5);
+plot(obj.X(frame), obj.Y(frame), 'ro', 'MarkerSize', 10);
+quiver(obj.X(frame), obj.Y(frame), obj.velocity(1,frame),  obj.velocity(2,frame), 5);
 hold off
 grid on
 box on
 xlabel('X ({\mu}m)')
 ylabel('Y ({\mu}m)')
-title(sprintf('%s', dirstr{direction(frame)+1}));
+title(sprintf('%s', dirstr{ obj.direction(frame)+1}));
 axis square; axis ij
 
 subplot(242)
-plot(angle(t0:t1)); hold on; plot([w+1 w+1],[0 max(angle)],'r'); hold off
-title('angle')
+plot(obj.angle(t0:t1)); hold on; plot([w+1 w+1],[0 max(obj.angle)],'r'); hold off
+xlabel('time [s]');
+title('angle [deg]')
 axis square; axis tight; grid on;
 
 subplot(243)
-plot(curvature(t0:t1));hold on; plot([w+1 w+1],[min(curvature) max(curvature)],'r'); hold off
+plot(obj.curvature(t0:t1));hold on; plot([w+1 w+1],[min(obj.curvature) max(obj.curvature)],'r'); hold off
 title('curvature')
 axis square; axis tight; grid on;
 
 subplot(244)
-speed = sqrt(sum(veloc.^2));
+speed = sqrt(sum(obj.velocity.^2));
 plot(speed(t0:t1));hold on; plot([w+1 w+1],[min(speed) max(speed)],'r'); hold off
 title('speed')
+xlabel('time [s]');
+ylabel('speed [um/s]');
 axis square; axis tight; grid on;
 
 subplot(245)
-plot(angle,speed,'-');
+plot(obj.angle,speed,'-');
 hold on;
-plot(angle(frame),speed(frame),'r.');
+plot(obj.angle(frame),speed(frame),'r.');
 xlabel('angle [deg]');
 ylabel('speed [um/s]');
 hold off
 axis square; axis tight; grid on;
 
-subplot(247)
-plot(T(t0:t1),R(t0:t1),'r');hold on; plot([w+1 w+1],[min(R) max(R)],'r'); hold off
-
+subplot(246)
+imagesc(obj.wavelet); hold on; plot([frame, frame],[0 64],'r');hold off
 axis square; axis tight; grid on;
+xlabel('time [s]');
+ylabel('scale');
+title('Wavelet transform');
+
+subplot(247)
+plot(obj.relative_velocity(1,:), obj.relative_velocity(2,:));
+hold on;
+plot(obj.relative_velocity(frame,1), obj.relative_velocity(frame,2),'ro');
+hold off
+axis square; axis tight; grid on;
+xlabel('time [s]');
+ylabel('scale');
+title('Wavelet transform');
+
+subplot(248)
+plot(obj.R(t0:t1));hold on; plot([w+1 w+1],[min(obj.R),max(obj.R)],'r'); hold off
+%plot(T,R,'r');%hold on; plot([w+1 w+1],[0,2],'r'); hold off
+axis square; axis tight; grid on;
+xlabel('time [s]');
+ylabel('ratio');
 title('Ratio');
 end
 

@@ -34,6 +34,8 @@ classdef neurotrackertiff
         exposuretime; % Exposure time for each image
         flip; % Flip images X and Y directions        
         stageunitum; % stage unit in um
+        stagecalibration;        
+        imgtform;
     end
 
     methods      
@@ -47,7 +49,8 @@ classdef neurotrackertiff
             obj = obj.setwarningmode(warningmode);
             obj.flip = ~[true,false;false,true];
             obj.pixelsize =[6.5 6.5];     
-            obj.stageunitum = 1;
+            obj.stageunitum = [1 1];
+            obj.stagecalibration = [1 0;0 1];
             obj = obj.loadmetadata();
             obj = obj.opentiff();
             obj = obj.parsestageindex();
@@ -64,9 +67,9 @@ classdef neurotrackertiff
                     fprintf( '''%d: %s''\n', i, obj.pathtofile{i});
                 end
             end
-            fprintf('pixel size: %.2fx%.2fum\n', obj.pixelsize);
+            fprintf('pixel size: %.2f x %.2fum\n', obj.pixelsize);
             fprintf('magnification: %.2fX\n', obj.magnification);
-            fprintf('stage unit: %fum\n', obj.stageunitum);
+            fprintf('stage unit: %.2f x %.2f um\n', obj.stageunitum);
             fov = max(obj.range(),[],2) - min(obj.range(),[],2);
             fprintf('total field of view: %.2f x %.2f um\n', fov);
             D = max(obj.timestamps) - min(obj.timestamps);
@@ -168,16 +171,28 @@ classdef neurotrackertiff
         end
         
         function value = stageposition(obj,frame,channel,axis)
+            S = obj.stageindex;
+            S = obj.stageindex(1:2:end-1,:);
+            S = diff(S,1,1);
+            S = [S, ones(size(S,1),1)] * obj.stagecalibration;              
+            S = [[0 0]; S(:,1:2)];
+            S = cumsum(S,1);            
+            S = S - repmat(min(S),[size(S,1) 1]);
             n = obj.offset(frame,channel);
-            value = obj.stageindex(n,axis) * obj.stageunitum;
+            value = S(frame,axis);
+            
+            %n = obj.offset(frame,channel);
+            %value = obj.stageindex(n,axis) .* obj.stageunitum(axis);
         end
         
-        function R = stagerange(obj)
-            R = [min(obj.stageindex);max(obj.stageindex)]' * obj.stageunitum;            
+        function R = stagerange(obj)   
+            p = obj.stageposition(1:obj.datasize(5),1,1:2);
+            R = [min(p)' max(p)'];
+            %R = [min(obj.stageindex); max(obj.stageindex)]' .* repmat(obj.stageunitum',1,2);              
         end
         
         function R = range(obj)            
-            R = obj.stagerange() + obj.pixelsize' / obj.magnification .* obj.datasize(1:2)' * [0 1];            
+            R = obj.stagerange() + obj.pixelsize' / obj.magnification .* obj.datasize(1:2)' * [-1 1];            
         end
 
         function obj = parsetimestamps(obj) 
@@ -257,14 +272,14 @@ classdef neurotrackertiff
             imshowpair(im1,ref1,im2,ref2,'falsecolor','ColorChannels', [1 2 0]);
         end
 
-        function playmovie(obj, usestageaxis, stepframe)
+        function playmovie(obj, usestageaxis, skipframe)
             if nargin < 2
                 usestageaxis = true;
             end
             if nargin < 3
-                stepframe = 1;
+                skipframe = 0;
             end
-            for frame = 1:stepframe:obj.length()
+            for frame = 1:(skipframe+1):obj.length()
                 obj.imshowpair(frame);
                 %hold on;
                 %plot(obj.stageposition(1:2:end,1), obj.stageposition(1:2:end,2));
@@ -294,62 +309,72 @@ classdef neurotrackertiff
             hold off
         end
         
-        function P = pano(obj, channel, stepframe, blendingmode)            
+        function P = pano(obj, channel, stepframe, blendingmode)
             % P = nt.pano(channel, stepframe, blendingmode)
             %
             % Input:
-            %  channel : color channel 
+            %  channel : color channel
             %  stepframe : frame to skip
             %  blendingmode : if equal to 1, 'average projection' otherwise
             %                 'max projection'
-            % Output 
+            % Output
             %  panoramic image for the 'channel' with 1 frame every
             %  'stepframe'
             %
-            s = obj.pixelsize / obj.magnification; 
-            % determine the size in pixel of covered by all images           
-            R = obj.range() ./ (s' * [1 1]); % XY range                     
-            sz = ceil(R(:,2) - R(:,1))';                      
+            s = obj.pixelsize / obj.magnification;
+            % determine the size in pixel of covered by all images
+            S = obj.stageposition(1:obj.datasize(5),1,1:2);
+            R = [min(S)', max(S)'] ./ (s' * [1 1]); % XY range in pixel     
+            R = R + [-0*obj.datasize(1:2)' obj.datasize(1:2)'];            
+            sz = ceil(R(:,2) - R(:,1))';
             sz = sz(2:-1:1);
             % compute a zoom factor
             if max(sz) > 0.5*max(get(groot,'ScreenSize'))
                 alpha = 0.5*max(get(groot,'ScreenSize')) / max(sz);
                 sz = ceil(alpha * sz);
-            end            
-            fprintf(1,'pano size is %d x %d pixel (zoom:%f)\n', sz(1), sz(2), alpha);            
+            else 
+                alpha = 1;
+            end
+            fprintf(1,'pano size is %d x %d pixel (zoom:%f)\n', sz(1), sz(2), alpha);
             img = obj.imread(1, channel);
-            % two accumulators 
+            % two accumulators
             P = mean(double(img(:))) .* ones(sz);
-            N = ones(sz);            
+            N = ones(sz);
             for frame = 1:stepframe:obj.length()
                 % load and scale the image
-                im = obj.imread(frame, channel);
+                im = obj.imread(frame, channel);                
+                %im = imwarp(im, obj.imgtform(channel).tform);
                 im = imresize(im, alpha);
                 % compute the position in the destination image                
-                d = alpha * (obj.stageposition(frame,channel,1:2) ./ s(:)' - R(:,1)');
+                d = alpha * (S(frame,:) ./ s(:)' - R(:,1)');
                 l = max(1, ceil(d(2:-1:1))); % lower bound
-                u = l + size(im) - 1; % upper boud                         
+                u = l + size(im) - 1; % upper boud                
+                try 
                 if blendingmode == 1
                     P(l(1):u(1),l(2):u(2)) = P(l(1):u(1),l(2):u(2)) + double(im);
-                    N(l(1):u(1),l(2):u(2)) = N(l(1):u(1),l(2):u(2)) + 1;
+                    N(l(1):u(1),l(2):u(2)) = N(l(1):u(1),l(2):u(2)) + double(im > 1);
                 else
                     P(l(1):u(1),l(2):u(2)) = max(P(l(1):u(1),l(2):u(2)) , double(im));
-                end            
+                end
+                catch
+                    
+                    fprintf('out of bounds %d, %d / %d, %d\n',l,u);
+                end
             end
             if blendingmode == 1
                 P(N>0) = P(N>0) ./ N(N>0);
             end
             %P = P - min(P(:));
         end
-
+        
         function [x,y] = tostagecoords(obj, x, y, frame, channel)
             % [x,y] = tostagecoords(obj, x, y, frame, channel)
-            % 
-            % convert the coordinates X,Y in pixel in the image to the 
+            %
+            % convert the coordinates X,Y in pixel in the image to the
             % coordinates of the real world by taking into account the
             % stage position, the pixel size and the magnification
             %
-            d = obj.stageposition(frame, channel,1:2);     
+            d = obj.stageposition(frame, channel,1:2);
             s = obj.pixelsize / obj.magnification;
             c = obj.datasize(1:2) / 2;
             x = d(1) + s(1) * (x - c(1));
@@ -357,46 +382,115 @@ classdef neurotrackertiff
         end
         
         
-        function obj = calibratestageunit(obj,stepframe)
-            % obj = calibratestageunit(obj,stepframe)
-            % calibrate the stage unit 
+        function obj = calibratestageunit(obj,stepframe,method,dframe)
+            %
+            % obj = calibratestageunit(obj, stepframe, method)
+            %
+            % calibrate the stage unit for each channel and the flip matrix
+            %
             % note sequence must be a film of a moving stage only
+            %
+            % - stepframe is a subsampling step of the movie  (default = 10)
+            % - method : registration method: 'imregcorr' (default) or 'compute_displacement'
+            % - dframe number of frame between two registered image (default = 1)
+            %
+            
             if nargin < 2
                 stepframe = 10;
             end
-            obj.stageunitum = 1;
-            clf;
-            k = 1;            
-            for frame = 1:stepframe:obj.length() - 1;                
-                im1 = obj.imread(frame, 1);
-                im2 = obj.imread(frame + 1, 1);
-                tform = imregcorr(im2single(im1),im2single(im2),'translation');
-                I(k,:) = tform.T(3,1:2);
-                S(k,:) = obj.stageposition(frame + 1,1,1:2) - obj.stageposition(frame,1,1:2);
-                De(k) = norm(tform.T(3,1:2)) * obj.pixelsize(1) / obj.magnification;
-                Ds(k) = norm(obj.stageposition(frame + 1,1,1:2) - obj.stageposition(frame,1,1:2));
-                imshowpair(im1,circshift(im2,-round(tform.T(3,2:-1:1))),'falsecolor','ColorChannels', [1 2 0]);
-                axis on
-                title(sprintf('%d/%d',frame,obj.length()))
-                drawnow                
-                k = k + 1;
+            if nargin < 3
+                method = 'imregcorr';
             end
-            subplot(121)
-            plot(De,Ds);
-            xlabel('image [um]');
-            ylabel('stage [um]');
-            axis square
-            subplot(122)
-            c = mean(De/Ds);
-            obj.stageunitum = c;
-            plot(I(:,1),I(:,2));hold on; plot(c*S(:,1),c*S(:,2));hold off;
-            legend('image','stage')
-            xlabel('{\Delta}X [um]');
-            ylabel('{\Delta}Y [um]');
-            axis equal
-            axis square
-            fprintf('Stage unit is %.3fum\n', c);
+            if nargin < 4
+                dframe = 1;
+            end
+            fprintf('Calibrate stage units every %d frame with %s method\n', stepframe, method);
+            obj.stageunitum = [1, 1];
+            clf;
+            tic
+            k = 1;
+            obj.flip = [false, false; false, false];
+            for channel = 1:2
+                kc = 1;
+                clear I S; % image and stage displacements in um over time
+                for frame = 1:(stepframe-1):obj.length() - dframe;
+                    % read both images
+                    im1 = tape(im2single(obj.imread(frame, channel)));
+                    im2 = tape(im2single(obj.imread(frame + dframe, channel)));
+                    if strcmp(method,'imregcorr')
+                        tform = imregcorr(im1,im2,'translation');
+                        v = tform.T(3,1:2);
+                    elseif strcmp(method,'imregtfrom')
+                        [optimizer,metric] = imregconfig('monomodal');
+                        tform = imregtform(im1,im2,'rigid',optimizer,metric);
+                        v = tform.T(3,1:2);
+                    else
+                        v = compute_displacement(im1,im2);
+                    end
+                    I(kc,:) = v * obj.pixelsize(1) / obj.magnification;
+                    S(kc,:) = [0,0];
+                    for i = 1:dframe
+                        n1 = obj.offset(frame+i-1,channel);
+                        n2 = obj.offset(frame+i,channel);
+                        S(kc,:) = S(kc,:) + obj.stageindex(n2,:) - obj.stageindex(n1,:);
+                    end
+                    De(k) = norm(I(kc,:));
+                    Ds(k) = norm(S(kc,:));
+                    %imshowpair(im1,circshift(im2,-round(tform.T(3,2:-1:1))),'falsecolor','ColorChannels', [1 2 0]);
+                    %imshowpair(im1,im2,'falsecolor','ColorChannels', [1 2 0]);
+                    %axis on
+                    %title(sprintf('%d/%d : %.2fum / %.2fum',frame,obj.length(), De(k), Ds(k)));
+                    %drawnow
+                    k = k + 1;
+                    kc = kc + 1;
+                end
+                toc                
+                A = [S ones(size(S,1),1)]\ [ I ones(size(I,1),1) ];
+                A(:,3) = [0; 0; 1]; % force A to be an affine matrix
+                for dim=1:2
+                    if A(dim,dim) < 0 
+                        obj.flip(channel,dim) = true;
+                        I(:,dim) = -I(:,dim);
+                        A(:,dim) = -A(:,dim);
+                    end
+                end 
+                St = [S, ones(size(S,1),1)] * A;                                
+                subplot(3,1,1)
+                plot(De,Ds);
+                xlabel('image [um]');
+                ylabel('stage [um]');
+                axis square
+                subplot(3,1,channel+1)                                                
+                plot(I(:,1),I(:,2));hold on; plot(St(:,1),St(:,2),'--');hold off;
+                legend('image','stage')
+                xlabel('{\Delta}X [um]');
+                ylabel('{\Delta}Y [um]');                
+                axis equal
+                axis square
+                if channel == 1
+                    obj.stagecalibration = A;
+                    obj.stageunitum = sqrt(sum(A(1:2,1:2).^2));  
+                end
+            end            
+            fprintf('Stage unit is now %.3f x %.3fum\n',  obj.stageunitum);
+            fprintf('Camera flip  is now %d %d %d %d \n', obj.flip);
+        end                
+        
+        function savestagecalibration(obj,filename)
+            fprintf('Saving stage calibration and flip to file ''%s''\n', filename);
+            ntcalibration =  obj.stagecalibration; %#ok<NASGU>
+            ntflip = obj.flip;
+            ntstageunitum = obj.stageunitum;
+            save(filename,'ntcalibration','ntflip','ntstageunitum');
         end
+        
+        function obj = loadstagecalibration(obj,filename)
+            fprintf('Loading stage calibration and flip from file ''%s''\n', filename);
+            load(filename);            
+            obj.stagecalibration = ntcalibration;
+            obj.flip = ntflip;
+            obj.stageunitum = ntstageunitum;
+        end                
 
         function debug(obj, msg)
             if obj.warningmode > 0
@@ -404,5 +498,4 @@ classdef neurotrackertiff
             end
         end
     end
-
 end
